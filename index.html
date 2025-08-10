@@ -1,0 +1,250 @@
+// AI Learning Coach - Single-file React component (previewable)
+// File: AILearningCoach.jsx
+// Description: Frontend prototype for a personalized learning coach integrated with ChatGPT (free-tier/web). 
+// - Uses Tailwind CSS for styling (assumes Tailwind available in host app)
+// - Builds the system prompt and user messages to send to a backend endpoint (/api/chat)
+// - Stores user profile, daily logs, and points in localStorage
+// - Provides a fallback local-simulated planner when backend is not connected
+// Usage: Drop this component into a React app (Vite/Next.js/CRA) and wire /api/chat to your server
+
+import React, { useEffect, useState } from 'react';
+
+export default function AILearningCoach() {
+  // Profile & goals
+  const [profile, setProfile] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('alc_profile')) || {}; } catch(e){ return {}; }
+  });
+  const [goalText, setGoalText] = useState(profile.goal || '');
+  const [availabilityText, setAvailabilityText] = useState(profile.availability || '');
+
+  // UI states
+  const [view, setView] = useState('setup'); // setup | dashboard | log
+  const [todayPlan, setTodayPlan] = useState(() => JSON.parse(localStorage.getItem('alc_todayPlan')) || null);
+  const [logs, setLogs] = useState(() => JSON.parse(localStorage.getItem('alc_logs')) || []);
+  const [points, setPoints] = useState(() => Number(localStorage.getItem('alc_points')) || 0);
+  const [loading, setLoading] = useState(false);
+  const [apiUrl, setApiUrl] = useState('/api/chat'); // change when you wire a backend
+  const [message, setMessage] = useState('');
+
+  useEffect(() => { localStorage.setItem('alc_profile', JSON.stringify(profile)); }, [profile]);
+  useEffect(() => { localStorage.setItem('alc_todayPlan', JSON.stringify(todayPlan)); }, [todayPlan]);
+  useEffect(() => { localStorage.setItem('alc_logs', JSON.stringify(logs)); }, [logs]);
+  useEffect(() => { localStorage.setItem('alc_points', String(points)); }, [points]);
+
+  // --- Prompt builder ---
+  function buildSystemPrompt() {
+    return `You are a personal AI learning and productivity coach. Your job is to ask clarifying questions, create a daily schedule tailored to the user's goal and availability, accept daily updates, summarize progress, maintain a points system, and provide trend insights. Be friendly, actionable and specific.`;
+  }
+
+  function buildUserPrompt(profile) {
+    return `Goal:\n${profile.goal}\n\nAvailability:\n${profile.availability}\n\nConstraints: Sleep ${profile.sleep || 'unknown'}, Work ${profile.workHours || 'unknown'}. Preferences: ${profile.preferences || 'none'}.`;
+  }
+
+  // --- Server call: sends system + user messages to backend which should call ChatGPT/free endpoint ---
+  async function callPlannerAPI(profile) {
+    setLoading(true);
+    try {
+      const payload = {
+        system: buildSystemPrompt(),
+        user: buildUserPrompt(profile),
+        instructions: `Return a JSON object with: { roadmap: string, today_plan: [{title, start, end, duration_mins, notes}], weekly_targets: [...], scoring_rules: {...} }`,
+      };
+
+      // try calling backend
+      const res = await fetch(apiUrl, {
+        method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload)
+      });
+      if (!res.ok) throw new Error('API not connected');
+      const data = await res.json();
+      setTodayPlan(data.today_plan || data.today_plan_suggested || { generatedAt: new Date().toISOString() });
+      setMessage('Plan generated from API');
+    } catch (err) {
+      // fallback local generator
+      console.warn('API failed, using local generator', err);
+      const fallback = localGeneratePlan(profile);
+      setTodayPlan(fallback.today_plan);
+      setMessage('Plan generated locally (fallback)');
+    } finally { setLoading(false); }
+  }
+
+  // --- Local plan generator (simple heuristic) ---
+  function localGeneratePlan(profile) {
+    // naive parse of availability: expects something like "free 8-11, 14-17" or plain hours
+    const now = new Date();
+    const plan = [];
+    // Put morning revision if available
+    plan.push({ title: 'Revision — ML/DL/NLP (short)', start: '09:00', end: '09:30', duration_mins: 30, notes: 'Quick revision — focus on 1 topic' });
+    plan.push({ title: 'Deep learning: GenAI module', start: '10:00', end: '12:00', duration_mins: 120, notes: 'Project-based: implement small demo' });
+    plan.push({ title: 'Lunch + break', start: '12:00', end: '13:00', duration_mins: 60, notes: 'Relax' });
+    plan.push({ title: 'DSA practice (2 problems)', start: '15:00', end: '16:00', duration_mins: 60, notes: 'Focus on arrays/strings' });
+    plan.push({ title: 'Evening review & notes', start: '20:00', end: '20:30', duration_mins: 30, notes: 'Summarize learnings and update log' });
+
+    return { roadmap: '3-month upskill + revision roadmap (local-simulated)', today_plan: plan, weekly_targets: ['Finish RAG primer', 'Implement agent demo'], scoring_rules: { completeTask: +10, missTask: -5 } };
+  }
+
+  // --- Save profile and generate initial plan ---
+  function handleSaveProfile(e) {
+    e.preventDefault();
+    const p = { goal: goalText.trim(), availability: availabilityText.trim(), createdAt: new Date().toISOString() };
+    setProfile(p);
+    callPlannerAPI(p);
+    setView('dashboard');
+  }
+
+  // --- Daily logging ---
+  function addDailyLog(log) {
+    const entry = { id: Date.now(), date: new Date().toISOString(), ...log };
+    setLogs(prev => [entry, ...prev]);
+    // scoring
+    const delta = computePointsDelta(log);
+    setPoints(prev => prev + delta);
+  }
+
+  function computePointsDelta(log) {
+    // simple rules: completedTasks vs plannedTasks
+    if (!log.plannedTasks) return 0;
+    const completed = Number(log.completedTasks || 0);
+    const planned = Number(log.plannedTasks || 0);
+    if (planned === 0) return 0;
+    const ratio = completed / planned;
+    if (ratio >= 1) return 10; // full points
+    if (ratio >= 0.6) return 5;
+    return -5;
+  }
+
+  // --- Trend analysis ---
+  function analyzeTrends() {
+    // naive: look across logs for times mentioned
+    const trend = { bestStudyWindow: '09:00-12:00', weakest: '21:00-23:00' };
+    return trend;
+  }
+
+  // --- UI fragments ---
+  function SetupView() {
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <h2 className="text-2xl font-bold mb-4">Setup your goal & availability</h2>
+        <form onSubmit={handleSaveProfile} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium">Your goal (short & long term)</label>
+            <textarea required value={goalText} onChange={e=>setGoalText(e.target.value)} rows={4} className="w-full p-2 border rounded" placeholder="E.g. Switch job in 3 months; upskill in GenAI, RAG, Agentic AI; revise ML/DL/NLP; DSA daily"></textarea>
+          </div>
+          <div>
+            <label className="block text-sm font-medium">Daily availability / routine</label>
+            <textarea required value={availabilityText} onChange={e=>setAvailabilityText(e.target.value)} rows={3} className="w-full p-2 border rounded" placeholder="E.g. Work 2pm-11pm; Sleep 12am-7am; Free 8am-1pm and 11pm-12am"></textarea>
+          </div>
+          <div className="flex gap-2">
+            <button type="submit" className="px-4 py-2 bg-sky-600 text-white rounded">Save & Generate Plan</button>
+            <button type="button" onClick={()=>{ setGoalText(''); setAvailabilityText(''); }} className="px-4 py-2 border rounded">Reset</button>
+          </div>
+        </form>
+
+        <div className="mt-6 text-sm text-muted">Note: This prototype requires a backend at <code>/api/chat</code> that proxies to ChatGPT or you can use the built-in fallback plan generator.</div>
+      </div>
+    );
+  }
+
+  function DashboardView() {
+    const trend = analyzeTrends();
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold">Personal AI Learning Coach</h1>
+            <p className="text-sm text-gray-600">Goal: {profile.goal}</p>
+            <p className="text-sm text-gray-600">Points: <strong>{points}</strong></p>
+          </div>
+          <div className="space-x-2">
+            <button onClick={()=>callPlannerAPI(profile)} className="px-3 py-1 border rounded">Regenerate Plan</button>
+            <button onClick={()=>setView('log')} className="px-3 py-1 border rounded">Add Daily Log</button>
+            <button onClick={()=>{ setProfile({}); setTodayPlan(null); setLogs([]); setPoints(0); localStorage.clear(); setView('setup'); }} className="px-3 py-1 text-red-600">Reset All</button>
+          </div>
+        </div>
+
+        <section className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 border rounded">
+            <h3 className="font-semibold">Today's Plan</h3>
+            {loading && <div>Loading...</div>}
+            {!todayPlan && <div className="text-sm text-gray-500">No plan yet. Generate one.</div>}
+            {todayPlan && (
+              <ol className="mt-2 space-y-2">
+                {todayPlan.map((t, i) => (
+                  <li key={i} className="p-2 border rounded">
+                    <div className="font-medium">{t.title} <span className="text-xs text-gray-500">{t.start} — {t.end}</span></div>
+                    <div className="text-sm text-gray-600">{t.notes}</div>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+
+          <div className="p-4 border rounded">
+            <h3 className="font-semibold">Trends & Weekly Targets</h3>
+            <div className="mt-2 text-sm">Best study window: {trend.bestStudyWindow}</div>
+            <div className="mt-2 text-sm">Weakest window: {trend.weakest}</div>
+            <div className="mt-4">
+              <h4 className="font-medium">Recent Logs</h4>
+              <ul className="mt-2 space-y-2 text-sm">
+                {logs.slice(0,5).map(l=> (
+                  <li key={l.id} className="p-2 border rounded">{new Date(l.date).toLocaleString()} — Completed {l.completedTasks}/{l.plannedTasks} tasks</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
+  function LogView() {
+    const [plannedTasks, setPlannedTasks] = useState(3);
+    const [completedTasks, setCompletedTasks] = useState(2);
+    const [notes, setNotes] = useState('');
+
+    function submitLog(e) {
+      e.preventDefault();
+      addDailyLog({ plannedTasks, completedTasks, notes });
+      setView('dashboard');
+    }
+
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <h2 className="text-xl font-bold mb-4">Daily Log</h2>
+        <form onSubmit={submitLog} className="space-y-4">
+          <div>
+            <label className="block text-sm">Planned tasks for today</label>
+            <input type="number" value={plannedTasks} onChange={e=>setPlannedTasks(Number(e.target.value))} className="w-24 p-2 border rounded" />
+          </div>
+          <div>
+            <label className="block text-sm">Completed tasks</label>
+            <input type="number" value={completedTasks} onChange={e=>setCompletedTasks(Number(e.target.value))} className="w-24 p-2 border rounded" />
+          </div>
+          <div>
+            <label className="block text-sm">Notes</label>
+            <textarea value={notes} onChange={e=>setNotes(e.target.value)} rows={3} className="w-full p-2 border rounded" />
+          </div>
+          <div className="flex gap-2">
+            <button className="px-4 py-2 bg-green-600 text-white rounded">Submit Log</button>
+            <button type="button" onClick={()=>setView('dashboard')} className="px-4 py-2 border rounded">Cancel</button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto py-8">
+        {view === 'setup' && <SetupView />}
+        {view === 'dashboard' && <DashboardView />}
+        {view === 'log' && <LogView />}
+
+        <div className="max-w-4xl mx-auto mt-6 text-sm text-gray-500 p-4">
+          <div>API endpoint: <code>{apiUrl}</code>. To wire to ChatGPT free/web, create a small server that receives the payload and calls the web version or proxies to your ChatGPT API key. The expected POST body: {"system":..., "user":..., "instructions":...} and returns JSON with <code>today_plan</code>.</div>
+          <div className="mt-2">Want me to also scaffold the backend (Node/Express) and an example serverless function to call OpenAI? Click "Yes" in the chat.</div>
+          {message && <div className="mt-2 text-sm text-sky-600">{message}</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
