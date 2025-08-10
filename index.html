@@ -1,0 +1,352 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>AI Learning Coach — Lite</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800 font-sans">
+  <header class="bg-white shadow p-4">
+    <div class="max-w-5xl mx-auto flex justify-between items-center">
+      <h1 class="text-2xl font-bold text-blue-600">AI Learning Coach</h1>
+      <nav class="text-sm text-gray-600 space-x-4">
+        <a href="#" id="nav-home" class="hover:text-blue-600">Home</a>
+        <a href="#" id="nav-dashboard" class="hover:text-blue-600">Dashboard</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto p-6">
+    <section id="hero" class="text-center my-8">
+      <h2 class="text-3xl font-bold mb-2">A simple, actionable study coach — no installs.</h2>
+      <p class="text-gray-600 mb-4">Tell the coach your target, available time and routine. Get a daily plan and track progress.</p>
+      <div class="flex justify-center gap-3">
+        <button id="btn-get-started" class="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Get Started</button>
+        <button id="btn-sample" class="px-6 py-3 bg-white border border-gray-200 rounded-lg hover:bg-gray-50">Load Sample Goal</button>
+      </div>
+    </section>
+
+    <section id="setup-section" class="hidden bg-white shadow rounded-lg p-6 mb-6">
+      <h3 class="text-xl font-semibold mb-3">Step 1 — Define your goal & routine</h3>
+      <form id="goal-form" class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium">Name</label>
+          <input id="input-name" class="mt-1 block w-full rounded border-gray-200 p-2" placeholder="Your name" required>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium">Short Goal</label>
+          <input id="input-goal" class="mt-1 block w-full rounded border-gray-200 p-2" placeholder="eg. Switch job in 3 months to GenAI role" required>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium">Topics (comma separated)</label>
+          <input id="input-topics" class="mt-1 block w-full rounded border-gray-200 p-2" placeholder="GenAI, RAG, Agents, ML, DL, NLP, DSA">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium">Deadline (target date)</label>
+            <input id="input-deadline" type="date" class="mt-1 block w-full rounded border-gray-200 p-2" required>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Daily available hours</label>
+            <input id="input-hours" type="number" min="0" max="24" value="3" class="mt-1 block w-full rounded border-gray-200 p-2" required>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium">Weekly study days</label>
+          <select id="input-days" class="mt-1 block w-full rounded border-gray-200 p-2">
+            <option value="7">Every day</option>
+            <option value="6">6 days</option>
+            <option value="5" selected>5 days</option>
+            <option value="4">4 days</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium">Daily routine note (optional)</label>
+          <input id="input-routine" class="mt-1 block w-full rounded border-gray-200 p-2" placeholder="I work 2pm-11pm, sleep 12-7..." >
+        </div>
+
+        <div class="flex gap-3">
+          <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded">Create plan</button>
+          <button id="btn-cancel-setup" type="button" class="px-4 py-2 bg-gray-100 rounded">Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <section id="plan-section" class="hidden bg-white shadow rounded-lg p-6 mb-6">
+      <div class="flex justify-between items-start">
+        <div>
+          <h3 class="text-xl font-semibold" id="plan-title">Today's Plan</h3>
+          <p class="text-sm text-gray-600" id="plan-sub"></p>
+        </div>
+        <div class="text-right">
+          <div class="text-sm text-gray-500">Points: <span id="points">0</span></div>
+          <div class="text-sm text-gray-500">Completion today: <span id="today-completion">0%</span></div>
+        </div>
+      </div>
+
+      <div class="mt-4" id="plan-tasks">
+        <!-- tasks will render here -->
+      </div>
+
+      <div class="mt-4 flex gap-3">
+        <button id="btn-save-log" class="px-4 py-2 bg-green-600 text-white rounded">Save today's progress</button>
+        <button id="btn-regenerate" class="px-4 py-2 bg-yellow-500 text-white rounded">Regenerate plan</button>
+      </div>
+    </section>
+
+    <section id="dashboard-section" class="hidden bg-white shadow rounded-lg p-6 mb-6">
+      <h3 class="text-xl font-semibold mb-2">Dashboard</h3>
+      <div class="grid md:grid-cols-2 gap-4">
+        <div class="p-4 bg-gray-50 rounded">
+          <h4 class="font-semibold">Goal</h4>
+          <p id="dash-goal" class="text-gray-700"></p>
+          <p class="text-sm text-gray-500">Deadline: <span id="dash-deadline"></span></p>
+          <p class="text-sm text-gray-500">Days left: <span id="dash-days-left"></span></p>
+        </div>
+        <div class="p-4 bg-gray-50 rounded">
+          <h4 class="font-semibold">Weekly trend</h4>
+          <div id="trend-list" class="text-sm text-gray-700 mt-2">-</div>
+        </div>
+      </div>
+      <div class="mt-4 p-4 bg-gray-50 rounded">
+        <h4 class="font-semibold">Recent logs</h4>
+        <div id="recent-logs" class="text-sm text-gray-700 mt-2">No logs yet</div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="bg-gray-100 p-4 text-center text-gray-600 text-sm">
+    © 2025 AI Learning Coach. All rights reserved.
+  </footer>
+
+<script>
+// Simple in-browser planner & tracker (Phase 1)
+// Data stored in localStorage under keys: alc_user, alc_plan, alc_logs, alc_points
+
+// Utilities
+const qs = sel => document.querySelector(sel);
+const qsa = sel => Array.from(document.querySelectorAll(sel));
+const todayDate = () => new Date().toISOString().slice(0,10);
+
+function loadData(key){ try{ return JSON.parse(localStorage.getItem(key)); }catch(e){ return null; } }
+function saveData(key,val){ localStorage.setItem(key, JSON.stringify(val)); }
+
+// App state
+let user = loadData('alc_user') || null;
+let plan = loadData('alc_plan') || null;
+let logs = loadData('alc_logs') || [];
+let points = loadData('alc_points') || 0;
+
+// Elements
+const btnGetStarted = qs('#btn-get-started');
+const btnSample = qs('#btn-sample');
+const setupSection = qs('#setup-section');
+const planSection = qs('#plan-section');
+const dashboardSection = qs('#dashboard-section');
+
+// Navigation
+qs('#nav-home').addEventListener('click', (e)=>{ e.preventDefault(); showHome(); });
+qs('#nav-dashboard').addEventListener('click', (e)=>{ e.preventDefault(); showDashboard(); });
+
+btnGetStarted.addEventListener('click', ()=>{ openSetup(); });
+btnSample.addEventListener('click', ()=>{ loadSample(); });
+
+qs('#btn-cancel-setup').addEventListener('click', ()=>{ hideAll(); showHome(); });
+
+// Form submit - create plan
+qs('#goal-form').addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const name = qs('#input-name').value.trim();
+  const goal = qs('#input-goal').value.trim();
+  const topics = qs('#input-topics').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const deadline = qs('#input-deadline').value;
+  const hours = Number(qs('#input-hours').value) || 1;
+  const days = Number(qs('#input-days').value) || 5;
+  const routine = qs('#input-routine').value.trim();
+
+  user = { name, goal, topics, deadline, hoursPerDay: hours, studyDaysPerWeek: days, routine, createdAt: new Date().toISOString() };
+  saveData('alc_user', user);
+
+  plan = generatePlan(user);
+  saveData('alc_plan', plan);
+
+  // reset today's log (if any)
+  // don't erase full history
+  renderAll();
+  showPlan();
+});
+
+// Save today's progress
+qs('#btn-save-log').addEventListener('click', ()=>{
+  const checked = qsa('.task-checkbox:checked').map(cb => cb.dataset.idx);
+  const total = qsa('.task-checkbox').length;
+  const date = todayDate();
+  const entry = { date, completed: checked, total };
+  // replace today's log if exists
+  logs = logs.filter(l=>l.date!==date);
+  logs.push(entry);
+  saveData('alc_logs', logs);
+  // update points: +10 per completed slot
+  const delta = checked.length * 10;
+  points = (points || 0) + delta;
+  saveData('alc_points', points);
+
+  alert('Progress saved. Points +' + delta);
+  renderAll();
+});
+
+qs('#btn-regenerate').addEventListener('click', ()=>{
+  if (!user) return alert('No plan');
+  plan = generatePlan(user, true);
+  saveData('alc_plan', plan);
+  renderAll();
+});
+
+function generatePlan(userObj, force=false){
+  // Simple generator: split hours into 30-min slots, assign topics round-robin.
+  const topics = (userObj.topics && userObj.topics.length>0) ? userObj.topics : ['General Revision','DSA'];
+  const slots = Math.max(1, Math.floor(userObj.hoursPerDay * 2)); // 30-min slots
+  const tasks = [];
+  // Allocation strategy: 50% new topics (first topics), 30% revision, 20% practice (DSA)
+  // We'll pick topics round-robin but prefer first topic as 'new'
+  for (let i=0;i<slots;i++){
+    const time = `${Math.floor(8 + Math.floor(i/2))}:${i%2===0 ? '00' : '30'}`; // naive times starting at 8:00
+    let kind = 'Study';
+    if (i >= Math.floor(slots*0.7)) kind = 'Practice';
+    else if (i >= Math.floor(slots*0.5)) kind = 'Revise';
+    const topic = topics[i % topics.length];
+    const title = `${kind}: ${topic}`;
+    tasks.push({ time, title, duration: '30m', idx: i });
+  }
+  const planObj = { created: new Date().toISOString(), tasks, slots, generatedFor: userObj.name };
+  return planObj;
+}
+
+function renderPlan(){
+  if(!plan) return;
+  qs('#plan-title').innerText = "Today's Plan";
+  qs('#plan-sub').innerText = `Plan for ${user.name} — ${user.goal}`;
+  const container = qs('#plan-tasks');
+  container.innerHTML = '';
+  plan.tasks.forEach(t=>{
+    const div = document.createElement('div');
+    div.className = 'flex items-center justify-between p-3 border-b';
+    div.innerHTML = `
+      <div>
+        <div class="font-medium">${t.title}</div>
+        <div class="text-sm text-gray-500">${t.time} • ${t.duration}</div>
+      </div>
+      <div>
+        <label class="inline-flex items-center">
+          <input type="checkbox" class="task-checkbox h-5 w-5" data-idx="${t.idx}" />
+        </label>
+      </div>`;
+    container.appendChild(div);
+  });
+
+  // update completion & points
+  const today = todayDate();
+  const entry = logs.find(l=>l.date===today);
+  const completed = entry ? entry.completed.length : 0;
+  const total = plan.tasks.length;
+  const pct = total===0 ? 0 : Math.round((completed/total)*100);
+  qs('#points').innerText = points || 0;
+  qs('#today-completion').innerText = pct + '%';
+  // check boxes if logged
+  if (entry){
+    entry.completed.forEach(idx=>{
+      const cb = qs('.task-checkbox[data-idx="'+idx+'"]');
+      if(cb) cb.checked = true;
+    });
+  }
+}
+
+function renderDashboard(){
+  if(!user){ qs('#dash-goal').innerText = '-'; qs('#dash-deadline').innerText = '-'; qs('#dash-days-left').innerText = '-'; return; }
+  qs('#dash-goal').innerText = user.goal;
+  qs('#dash-deadline').innerText = user.deadline;
+  const daysLeft = Math.max(0, Math.ceil((new Date(user.deadline) - new Date())/(1000*60*60*24)));
+  qs('#dash-days-left').innerText = daysLeft;
+  // trend - last 7 days completion percentage
+  const trend = [];
+  for(let i=6;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const key = d.toISOString().slice(0,10);
+    const entry = logs.find(l=>l.date===key);
+    const pct = entry && entry.total ? Math.round((entry.completed.length/entry.total)*100) : 0;
+    trend.push({ date: key, pct });
+  }
+  qs('#trend-list').innerHTML = trend.map(t=>`<div>${t.date}: ${t.pct}%</div>`).join('');
+  // recent logs
+  if (logs.length===0) qs('#recent-logs').innerText = 'No logs yet';
+  else qs('#recent-logs').innerHTML = logs.slice(-7).reverse().map(l=>`<div>${l.date} — ${l.completed.length}/${l.total}</div>`).join('');
+}
+
+function renderAll(){
+  // show/hide sections
+  if(!user) { hideAll(); showHome(); return; }
+  // show plan and dashboard
+  qs('#setup-section').classList.add('hidden');
+  qs('#plan-section').classList.remove('hidden');
+  qs('#dashboard-section').classList.remove('hidden');
+  renderPlan();
+  renderDashboard();
+}
+
+function openSetup(){
+  qs('#setup-section').classList.remove('hidden');
+  qs('#plan-section').classList.add('hidden');
+  qs('#dashboard-section').classList.add('hidden');
+}
+
+function showPlan(){ hideAll(); qs('#plan-section').classList.remove('hidden'); renderPlan(); renderDashboard(); }
+function showDashboard(){ hideAll(); qs('#dashboard-section').classList.remove('hidden'); renderDashboard(); }
+function showHome(){ hideAll(); qs('#hero').classList.remove('hidden'); }
+function hideAll(){
+  qs('#hero').classList.add('hidden');
+  qs('#setup-section').classList.add('hidden');
+  qs('#plan-section').classList.add('hidden');
+  qs('#dashboard-section').classList.add('hidden');
+}
+
+// sample data loader
+function loadSample(){
+  const sampleUser = {
+    name: 'Amrit',
+    goal: 'Switch job in 3 months to GenAI role',
+    topics: ['GenAI','RAG','Agentic AI','ML','DL','NLP','DSA'],
+    deadline: (()=>{ const d=new Date(); d.setMonth(d.getMonth()+3); return d.toISOString().slice(0,10); })(),
+    hoursPerDay: 3,
+    studyDaysPerWeek:5,
+    routine: 'Work 2pm-11pm, sleep 12-7'
+  };
+  user = sampleUser;
+  saveData('alc_user', user);
+  plan = generatePlan(user);
+  saveData('alc_plan', plan);
+  renderAll();
+  showPlan();
+}
+
+// initialize UI on load
+document.addEventListener('DOMContentLoaded', ()=>{
+  // if stored user, load plan and show
+  if(user && plan){
+    renderAll();
+    showPlan();
+  } else {
+    showHome();
+  }
+});
+</script>
+
+</body>
+</html>
